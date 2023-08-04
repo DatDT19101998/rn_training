@@ -1,0 +1,134 @@
+* Performance react-native Overview
+    - Một lý do thuyết phục để sử dụng React Native thay vì các công cụ 
+    dựa trên WebView là để đạt được 60 khung hình mỗi giây và giao diện
+    gốc cho ứng dụng của bạn
+    - Một số cách cải thiện hiệu suất app react native:
+        + Xoá bỏ các console.log trong quá trình phát triển trước khi lên prodcution: 
+        cài đặt thư viện: babel-plugin-transform-remove-console --save-dev
+        + Thêm mã code sau vào file .babelrc
+            {
+                "env": {
+                    "production": {
+                    "plugins": ["transform-remove-console"]
+                    }
+                }
+            }
+    - Đối với ListView có danh sách lớn: 
+        + tối ưu hoá query API
+        + hãy sử dụng thành phần FlatList hoặc SectionList mới
+        + Nếu FlatList của bạn hiển thị chậm, hãy đảm bảo rằng bạn đã triển khai 
+        getItemLayout để tối ưu hóa tốc độ hiển thị bằng cách bỏ qua phép đo các 
+        mục được hiển thị.
+        + Nếu bạn đang sử dụng ListView, bạn phải cung cấp một hàm rowHasChanged 
+        có thể giảm bớt rất nhiều công việc bằng cách nhanh chóng xác định xem một 
+        hàng có cần được hiển thị lại hay không. Nếu bạn đang sử dụng cấu trúc dữ 
+        liệu bất biến, thì đây chỉ cần là một kiểm tra tính bằng tham chiếu.
+    - Render performance chậm
+        + bạn có thể triển khai shouldComponentUpdate và chỉ ra các điều kiện chính 
+        xác mà theo đó bạn muốn thành phần kết xuất lại.bạn có thể tận dụng PureComponent 
+        để làm điều này cho mình. Một lần nữa, cấu trúc dữ liệu bất biến rất hữu ích để 
+        duy trì tốc độ này
+    - Rớt FPS luồng JS do làm nhiều việc trên luồng JavaScript cùng một lúc (Dấu hiệu 
+    là khi navigate app bị chậm)
+        + giải pháp có thể là sử dụng LayoutAnimation (Animated API)
+    - Di chuyển chế độ xem trên nhiều màn hình (cuộn, dịch, xoay) làm giảm  giao diện người 
+    dùng FPS
+        + sử dụng requestAnimationFrame khi thực hiện handleOnPress
+    - Slow navigator transitions: 
+        _ sử dụng Animated library
+* Speeding up your Build phase: Tăng tốc quá trình phát triển react native app
+    - Build only one ABI during development (Android-only): Khi xây dựng ứng dụng Android cục bộ, theo mặc định, bạn xây dựng tất cả 4 Giao 
+        diện nhị phân ứng dụng (ABI): armeabi-v7a, arm64-v8a, x86 & x86_64.Tuy nhiên, bạn
+        có thể không cần xây dựng tất cả chúng nếu bạn đang xây dựng cục bộ và thử nghiệm
+        trình giả lập của mình hoặc trên thiết bị vật lý.
+        + Nếu bạn đang sử dụng React Native CLI, bạn có thể thêm cờ --active-arch-only 
+        vào lệnh run-android(Cơ chế này dựa trên thuộc tính ReactNativeArchitectures 
+        Gradle.)
+            run: yarn react-native run-android --active-arch-only
+        + bạn có thể chỉ định ABI mà bạn muốn xây dựng như sau:
+            run: ./gradlew :app:assembleDebug -PreactNativeArchitectures=x86,x86_64
+    - Use a compiler cache (Sử dụng bộ đệm trình biên dịch)
+* Speeding Up CI Builds (Tăng tốc xây dựng CI): Dịch vụ CI nhanh rất quan trọng vì 
+2 lý do: Máy CI càng chạy nhiều thời gian thì càng tốn nhiều chi phí. Thời gian 
+chạy các công việc CI càng lâu thì vòng lặp phát triển càng dài. Do đó, điều 
+quan trọng là phải thử và giảm thiểu thời gian mà môi trường CI dành để xây 
+dựng React Native.
+    - Disable Flipper for iOS: Starting from React Native 0.71, we introduced 
+    a new flag in the template's Podfile: the NO_FLIPPER flag:
+        # from the root folder of the react native project
+        NO_FLIPPER=1 bundle exec pod install --project-directory=ios    
+    - Handle Transitive Dependencies(Xử lý các phụ thuộc bắc cầu): 
+    Ứng dụng của bạn có thể đang sử dụng một số thư viện phụ thuộc 
+    vào nhóm Flipper. Nếu đó là trường hợp của bạn, việc tắt trình
+    lật bằng cờ NO_FLIPPER có thể là không đủ: ứng dụng của bạn có 
+    thể không được xây dựng trong trường hợp này.
+        + Nếu bạn chưa có, hãy tạo một tệp mới có tên reac-native.config.js
+        + Thêm mã code sau vào react-native.config.js
+            module.exports = {
+                // other fields
+                dependencies: {
+                    ...(process.env.NO_FLIPPER
+                    ? {'react-native-flipper': {platforms: {ios: null}}}
+                    : {}),
+                },
+            };
+* Optimizing Flatlist Configuration (cải thiện hiệu suất FlatList)
+    - Với List props
+        + removeClippedSubviews (boolean): Nếu đúng, thì các chế độ xem bên 
+        ngoài chế độ xem được tách ra khỏi cấu trúc phân cấp chế độ xem gốc.
+        + maxToRenderPerBatch (number): Điều này kiểm soát số lượng mục được
+        hiển thị trên mỗi đợt, đây là phần tiếp theo của các mục được hiển 
+        thị trên mỗi cuộn. 
+        + updateCellsBatchingPeriod (Number): Điều này kiểm soát số lượng mục 
+        được hiển thị trên mỗi đợt, đây là phần tiếp theo của các mục được 
+        hiển thị trên mỗi cuộn.
+        + updateCellsBatchingPeriod (number): Mặc dù maxToRenderPerBatch cho 
+        biết số lượng mục được hiển thị mỗi đợt, cài đặt updateCellsBatchingPeriod 
+        cho VirtualizedList của bạn biết độ trễ tính bằng mili giây giữa các 
+        lần hiển thị hàng loạt (tần suất thành phần của bạn sẽ hiển thị các 
+        mục được hiển thị trong cửa sổ).
+        + initialNumToRender (number): Số lượng mục ban đầu để kết xuất
+        + windowSize: Số được chuyển vào đây là đơn vị đo lường trong 
+        đó 1 tương đương với chiều cao khung nhìn của bạn. Giá trị mặc 
+        định là 21 (10 khung nhìn phía trên, 10 khung nhìn phía dưới 
+        và một khung nhìn ở giữa).
+    - Với ListItem
+        + Use basic components
+        + Use cached optimized images (react-native-fast-image)
+        + Use getItemLayout
+        + Use keyExtractor or key: 
+            For functional components, move the renderItem function outside of 
+            the returned JSX. Also, ensure that it is wrapped in a "useCallback" 
+            hook to prevent it from being recreated each render.
+* Ram bundles and inline requireds:
+    - Inline Requires: 
+    eg: 
+        import React, {Component} from 'react';
+        import {TouchableOpacity, View, Text} from 'react-native';
+
+        let VeryExpensive = null;
+
+        export default class Optimized extends Component {
+        state = {needsExpensive: false};
+
+        didPress = () => {
+            if (VeryExpensive == null) {
+            VeryExpensive = require('./VeryExpensive').default;
+            }
+
+            this.setState(() => ({
+            needsExpensive: true,
+            }));
+        };
+
+        render() {
+            return (
+            <View style={{marginTop: 20}}>
+                <TouchableOpacity onPress={this.didPress}>
+                <Text>Load</Text>
+                </TouchableOpacity>
+                {this.state.needsExpensive ? <VeryExpensive /> : null}
+            </View>
+            );
+        }
+        }
